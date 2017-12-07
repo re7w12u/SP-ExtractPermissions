@@ -6,35 +6,39 @@ using System.Threading.Tasks;
 using Microsoft.SharePoint.Administration;
 using Microsoft.SharePoint;
 using System.IO;
+using System.Threading;
+using System.Drawing;
 
 namespace ExtractPermissionsConsoleApp
 {
-
-    class Permission
-    {
-        public string SESA { get; set; }
-        public string Url { get; set; }
-        public List<string> Permissions { get; set; }
-        public string Group { get; set; }
-
-        public override string ToString()
-        {
-            string p = String.Join(" - ", Permissions.ToArray());
-            return String.Format("{0};{1};{2};{3}", SESA, Url, Group, p);
-        }
-    }
-
     class Program : IDisposable
     {
-
         static Program p;
         static void Main(string[] args)
         {
 
             using (p = new Program())
             {
-                p.Spin = new ConsoleSpiner();
-                p.sesas = new List<string>
+                p.init();
+                p.GetCount();
+                p.Run();
+            }
+
+            Console.WriteLine("DONE.\r\nType any key to exit");
+            Console.ReadLine();
+        }
+
+
+        List<string> sesas;
+        List<Permission> Permissions { get; set; }
+        public string Path { get; set; }
+        public StreamWriter file { get; set; }
+        public Progress Progress { get; set; }
+        public List<string> Exceptions { get; set; }
+
+        void init()
+        {
+            sesas = new List<string>
             {
                "SESA44806",
                 "SESA49546",
@@ -51,26 +55,17 @@ namespace ExtractPermissionsConsoleApp
                 "SESA260501",
                 "SESA355685"
             };
-                p.Permissions = new List<Permission>();
-                p.Path = String.Format(@"{0}ExtractPermissions-{1}.csv", AppDomain.CurrentDomain.BaseDirectory, DateTime.Now.Ticks);
-                p.file = new System.IO.StreamWriter(p.Path, true);
-                p.Init();
-                p.Run();
-            }
-
-            Console.WriteLine("DONE.\r\nType any key to exit");
-            Console.ReadLine();
+            Permissions = new List<Permission>();
+            Path = String.Format(@"{0}ExtractPermissions-{1}.csv", AppDomain.CurrentDomain.BaseDirectory, DateTime.Now.Ticks);
+            file = new System.IO.StreamWriter(p.Path, true);
+            file.AutoFlush = true;
+            Exceptions = new List<string>
+                {
+                    "http://projects-sharing/sites/office_viewing_service_cache"
+                };
         }
 
-
-        List<string> sesas;
-        List<Permission> Permissions { get; set; }
-        public string Path { get; set; }
-        public ConsoleSpiner Spin { get; set; }
-        public StreamWriter file { get; set; }
-        public Progress Progress { get; set; }
-
-        void Init()
+        void GetCount()
         {
             Progress = new Progress();
             int count = 0;
@@ -91,22 +86,27 @@ namespace ExtractPermissionsConsoleApp
             foreach (SPWebApplication wa in webapps)
             {
                 SPSiteCollection sites = wa.Sites;
-                foreach (SPSite s in sites)
-                {
-                    foreach (SPWeb w in s.AllWebs)
-                    {
-                        foreach (SPList l in w.Lists)
-                        {
-                            if (l is SPDocumentLibrary && !l.Hidden)
-                            {
-                                countFolder(l.RootFolder);
-                            }
 
-                        }
-                        if (w != null) w.Dispose();
+                Parallel.ForEach(sites, (s) =>
+                {
+                    if (!Exceptions.Contains(s.RootWeb.Url.ToLower()))
+                    {
+                        SPWebCollection webs = s.AllWebs;
+                        Parallel.ForEach(webs, (w) =>
+                        {
+                            Console.WriteLine("{0}  --  {1}", Thread.CurrentThread.ManagedThreadId, w.Url);
+                            foreach (SPList l in w.Lists)
+                            {
+                                if (l is SPDocumentLibrary && !l.Hidden)
+                                {
+                                    countFolder(l.RootFolder);
+                                }
+                            }
+                            if (w != null) w.Dispose();
+                        });
                     }
                     if (s != null) s.Dispose();
-                }
+                });
             }
             Progress.Total = count;
             Console.WriteLine("[OK] {0} folders found. Proceeding...", count);
@@ -122,11 +122,11 @@ namespace ExtractPermissionsConsoleApp
             foreach (SPWebApplication wa in webapps)
             {
                 SPSiteCollection sites = wa.Sites;
-                foreach (SPSite s in sites)
+                Parallel.ForEach(sites, (s) =>
                 {
                     CheckWebPermissions(s.RootWeb);
                     if (s != null) s.Dispose();
-                }
+                });
             }
         }
 
@@ -142,10 +142,10 @@ namespace ExtractPermissionsConsoleApp
             }
 
             SPWebCollection webs = web.Webs;
-            foreach (SPWeb w in webs)
+            Parallel.ForEach(webs, (w) =>
             {
                 CheckWebPermissions(w);
-            }
+            });
 
             if (web != null) web.Dispose();
         }
@@ -240,24 +240,5 @@ namespace ExtractPermissionsConsoleApp
     }
 
 
-    public class ConsoleSpiner
-    {
-        int counter;
-        public ConsoleSpiner()
-        {
-            counter = 0;
-        }
-        public void Turn()
-        {
-            counter++;
-            switch (counter % 4)
-            {
-                case 0: Console.Write("/"); break;
-                case 1: Console.Write("-"); break;
-                case 2: Console.Write("\\"); break;
-                case 3: Console.Write("-"); break;
-            }
-            Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
-        }
-    }
+
 }
