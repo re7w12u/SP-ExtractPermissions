@@ -1,6 +1,7 @@
 ﻿using Microsoft.SharePoint;
 using Microsoft.SharePoint.Administration;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -22,6 +23,9 @@ namespace ExtractPermissionsConsoleApp
         Progress Progress;
         string[] Exceptions;
         SPWebApplication webApp;
+        ConcurrentQueue<Permission> Data;
+        ConcurrentQueue<PermissionError> Errors;
+
         public PermChecker(List<string> sesas, string[] exceptions, SPWebApplication webApplication)
         {
             this.Sesas = sesas;
@@ -36,22 +40,25 @@ namespace ExtractPermissionsConsoleApp
             long ticks = DateTime.Now.Ticks;
             OutputPath = String.Format(@"{0}ExtractPermissions-{1}-{2}.csv", AppDomain.CurrentDomain.BaseDirectory, webApp.Name, ticks);
             LogPath = String.Format(@"{0}ExtractPermissions-ERROR-{1}-{2}.log", AppDomain.CurrentDomain.BaseDirectory, webApp.Name, ticks);
-            OutputFile = new System.IO.StreamWriter(OutputPath, true);
-            OutputFile.AutoFlush = true;
-            LogFile = new System.IO.StreamWriter(LogPath, true);
-            LogFile.AutoFlush = true;
+            //OutputFile = new System.IO.StreamWriter(OutputPath, true);
+            //OutputFile.AutoFlush = true;
+            //LogFile = new System.IO.StreamWriter(LogPath, true);
+            //LogFile.AutoFlush = true;
             Progress = new Progress();
+            Data = new ConcurrentQueue<Permission>();
+            Errors = new ConcurrentQueue<PermissionError>();
         }
 
         public void GetCount()
         {
             int count = 0;
+            ConcurrentQueue<int> Count = new ConcurrentQueue<int>();
             Console.WriteLine("Initializing " + webApp.Name);
 
             Action<SPFolder> countFolder = null;
             countFolder = (f) =>
             {
-                count++;
+                Count.Enqueue(1);
                 foreach (SPFolder subF in f.SubFolders)
                 {
                     countFolder(subF);
@@ -69,11 +76,10 @@ namespace ExtractPermissionsConsoleApp
                     }
                 }
 
-
                 SPWebCollection webs = w.GetSubwebsForCurrentUser();
-                Parallel.ForEach(webs, (subWeb) =>
+                Parallel.ForEach(webs, (subWeb)=>
                 {
-                    Console.Write("{0}  --  {1}\r", Thread.CurrentThread.ManagedThreadId, count);
+                    //Console.Write("{0}  --  {1}\r", Thread.CurrentThread.ManagedThreadId, Count.Sum());
                     CountFolderInWeb(subWeb);
                 });
 
@@ -82,18 +88,15 @@ namespace ExtractPermissionsConsoleApp
 
             SPSiteCollection sites = webApp.Sites;
 
-            Parallel.ForEach(sites, (s) =>
+            Parallel.ForEach(sites, (s, loopState) =>
             {
-                    //if (!Exceptions.Contains(s.RootWeb.Url.ToLower()))
-                    //{
-                    CountFolderInWeb(s.RootWeb);
-                    //}
-                    if (s != null) s.Dispose();
+                CountFolderInWeb(s.RootWeb);                
+                if (s != null) s.Dispose();
             });
 
-            Progress.Total = count;
+            Progress.Total = Count.Sum();
             Console.WriteLine();
-            Console.WriteLine("[OK] {0} folders found. Proceeding...", count);
+            Console.WriteLine("[OK] {0} folders found. Proceeding...", Count.Sum());
         }
 
         public void Run()
@@ -110,6 +113,8 @@ namespace ExtractPermissionsConsoleApp
                 }
             });
 
+            File.WriteAllLines(OutputPath, Data.Select(x => x.ToString()).ToArray());
+            File.WriteAllLines(LogPath, Errors.Select(x => x.ToString()));            
         }
 
         private void CheckWebPermissions(SPWeb web)
@@ -162,7 +167,8 @@ namespace ExtractPermissionsConsoleApp
                                         Permissions = permissions
                                     };
 
-                                    WriteOuput(perm);
+                                    //WriteOuput(perm);
+                                    Data.Enqueue(perm);
                                 }
                             }
                         }
@@ -171,7 +177,13 @@ namespace ExtractPermissionsConsoleApp
             }
             catch (Exception ex)
             {
-                WriteError(folder, ex);
+                //WriteError(folder, ex);
+                Errors.Enqueue(new PermissionError {
+                    Url = String.Format("{0}/{1}", folder.ParentWeb.Url, folder.Url),
+                    Date = DateTime.Now.ToLongTimeString(),
+                    Message = ex.Message,
+                    StackTrace = ex.StackTrace
+                });
             }
 
             foreach (SPFolder f in folder.SubFolders)

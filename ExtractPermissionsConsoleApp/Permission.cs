@@ -6,6 +6,25 @@ using System.Threading.Tasks;
 
 namespace ExtractPermissionsConsoleApp
 {
+
+    class PermissionError
+    {
+        public string Url { get; set; }
+        public string Date { get; set; }
+        public string Message { get; set; }
+        public string StackTrace { get; set; }
+
+        public override string ToString()
+        {
+            return String.Format("------ {1} -------------------------{0}{2}{0}{3}{0}{4}",
+                Environment.NewLine,
+                Date,
+                Url,
+                Message,
+                StackTrace);
+        }
+    }
+
     class Permission
     {
         public string SESA { get; set; }
