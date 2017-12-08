@@ -1,0 +1,71 @@
+{
+    "Sesas": [
+        "SESA44806",
+        "SESA49546",
+        "SESA51948",
+        "SESA38738",
+        "SESA31241",
+        "SESA23683",
+        "SESA150795",
+        "SESA70398",
+        "SESA47749",
+        "SESA52920",
+        "SESA171296",
+        "SESA260501",
+        "SESA355685"
+    ],
+    "WebApps": [
+        {
+            "Name": "SharePoint - Archive - 80",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - eknowledge",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - chartreuse - 80",
+            "Check": true,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - rdits-mysite - 80",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint -  rdits-security",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint -  rdits-teamsite - 80",
+            "Check": true,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint -  rdits-tfs-portal - 80",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - 80",
+            "Check": true,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - 8081",
+            "Check": false,
+            "Exceptions": []
+        },
+        {
+            "Name": "SharePoint - ekpsp13.eur.gad.schneider-electric.com80",
+            "Check": false,
+            "Exceptions": []
+        }                                                                                                                              
+                                                                                                                                      
+           
+    ]
+}
